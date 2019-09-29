@@ -1,9 +1,6 @@
 This is a simple C++ header file to allow outputting of C++ containers.
 It is generic and can work with any container that has `begin` and `end`
-member functions.
+member functions. It avoids conflicts with existing output functions
+(like that for `std::string`) by detecting whether they can be used.
 
-To avoid ambiguity with standard output functions that work with
-`std::string` and `std::string_view`, they are specifically disabled
-from using this `operator<<` by specializing the `has_std_output` trait.
-If other classes conflicted with this implementation, they could be
-disabled similarly.
+Using this function requires a C++17-compliant compiler.
