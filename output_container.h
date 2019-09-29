@@ -1,77 +1,74 @@
 #ifndef OUTPUT_CONTAINER_H
 #define OUTPUT_CONTAINER_H
 
-#include <ostream>              // std::ostream
-#include <string>               // std::basic_string
-#include <string_view>          // std::basic_string_view
-#include <type_traits>          // std::false_type/true_type/is_same_v/...
-#include <utility>              // std::pair
-
-using std::ostream;
-using std::false_type;
-using std::true_type;
-
-using std::enable_if_t;
-using std::is_same_v;
-using std::remove_cv_t;
-using std::remove_reference_t;
+#include <ostream>      // std::ostream
+#include <type_traits>  // std::false_type/true_type/decay_t/is_same_v
+#include <utility>      // std::declval/pair
 
 template <typename T>
-struct is_pair : false_type {};
+struct is_pair : std::false_type {};
 template <typename T, typename U>
-struct is_pair<std::pair<T, U>> : true_type {};
+struct is_pair<std::pair<T, U>> : std::true_type {};
 template <typename T>
 inline constexpr bool is_pair_v = is_pair<T>::value;
 
 template <typename T>
-struct has_std_output : false_type {};
+struct has_output_function {
+    template <class U>
+    static auto output(U* ptr)
+        -> decltype(std::declval<std::ostream&>() << *ptr,
+                    std::declval<std::true_type>());
+    template <class U>
+    static std::false_type output(...);
+    static const bool value =
+        std::decay_t<decltype(output<T>(nullptr))>::value;
+};
 template <typename T>
-struct has_std_output<std::basic_string<T>> : true_type {};
-template <typename T>
-struct has_std_output<std::basic_string_view<T>> : true_type {};
-template <typename T>
-inline constexpr bool has_std_output_v = has_std_output<T>::value;
+inline constexpr bool has_output_function_v =
+    has_output_function<T>::value;
+// NB: Visual Studio 2017 (or below) may have problems with
+//     has_output_function_v<T>: you should then use
+//     has_output_function<T>::value instead, or upgrade to
+//     Visual Studio 2019.
 
 template <typename T, typename U>
-ostream& operator<<(ostream& os, const std::pair<T, U>& pr);
+std::ostream& operator<<(std::ostream& os, const std::pair<T, U>& pr);
 
 template <typename T>
-void output_element(ostream& os, const T& element, true_type);
+void output_element(std::ostream& os, const T& element, std::true_type);
 template <typename T>
-void output_element(ostream& os, const T& element, false_type);
+void output_element(std::ostream& os, const T& element, std::false_type);
 
 template <typename T,
-          typename = enable_if_t<!has_std_output_v<T>>>
-auto operator<<(ostream& os, const T& container)
+          typename = std::enable_if_t<!has_output_function_v<T>>>
+auto operator<<(std::ostream& os, const T& container)
     -> decltype(container.begin(), container.end(), os)
 {
-    using element_type = remove_cv_t<
-        remove_reference_t<decltype(*container.begin())>>;
-    using is_element_pair = is_pair<element_type>;
+    using std::decay_t;
+    using std::is_same_v;
+
+    using element_type = decay_t<decltype(*container.begin())>;
     constexpr bool is_char_v = is_same_v<element_type, char>;
     if constexpr (!is_char_v) {
         os << "{ ";
     }
     if (!container.empty()) {
         auto end = container.end();
-        --end;
+        bool on_first_element = true;
         for (auto it = container.begin(); it != end; ++it) {
             if constexpr (is_char_v) {
                 if (*it == '\0') {
                     break;
                 }
             }
-            output_element(os, *it, is_element_pair());
             if constexpr (!is_char_v) {
-                os << ", ";
+                if (!on_first_element) {
+                    os << ", ";
+                } else {
+                    on_first_element = false;
+                }
             }
-        }
-        if constexpr (is_char_v) {
-            if (*end != '\0') {
-                os << *end;
-            }
-        } else {
-            output_element(os, *end, is_element_pair());
+            output_element(os, *it, is_pair<element_type>());
         }
     }
     if constexpr (!is_char_v) {
@@ -81,19 +78,19 @@ auto operator<<(ostream& os, const T& container)
 }
 
 template <typename T>
-void output_element(ostream& os, const T& element, true_type)
+void output_element(std::ostream& os, const T& element, std::true_type)
 {
     os << element.first << " => " << element.second;
 }
 
 template <typename T>
-void output_element(ostream& os, const T& element, false_type)
+void output_element(std::ostream& os, const T& element, std::false_type)
 {
     os << element;
 }
 
 template <typename T, typename U>
-ostream& operator<<(ostream& os, const std::pair<T, U>& pr)
+std::ostream& operator<<(std::ostream& os, const std::pair<T, U>& pr)
 {
     os << '(' << pr.first << ", " << pr.second << ')';
     return os;
