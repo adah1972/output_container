@@ -37,6 +37,7 @@
 #include <type_traits>  // std::false_type/true_type/decay_t/is_same_v
 #include <utility>      // std::declval/pair
 
+// Type trait to detect std::pair
 template <typename T>
 struct is_pair : std::false_type {};
 template <typename T, typename U>
@@ -44,6 +45,7 @@ struct is_pair<std::pair<T, U>> : std::true_type {};
 template <typename T>
 inline constexpr bool is_pair_v = is_pair<T>::value;
 
+// Type trait to detect whether an output function already exists
 template <typename T>
 struct has_output_function {
     template <class U>
@@ -58,19 +60,28 @@ struct has_output_function {
 template <typename T>
 inline constexpr bool has_output_function_v =
     has_output_function<T>::value;
-// NB: Visual Studio 2017 (or below) may have problems with
-//     has_output_function_v<T>: you should then use
-//     has_output_function<T>::value instead, or upgrade to
-//     Visual Studio 2019.
+/* NB: Visual Studio 2017 (or below) may have problems with
+ *     has_output_function_v<T>: you should then use
+ *     has_output_function<T>::value instead, or upgrade to
+ *     Visual Studio 2019. */
 
+// Output function for std::pair
 template <typename T, typename U>
 std::ostream& operator<<(std::ostream& os, const std::pair<T, U>& pr);
 
-template <typename T>
-void output_element(std::ostream& os, const T& element, std::true_type);
-template <typename T>
-void output_element(std::ostream& os, const T& element, std::false_type);
+// Element output function for containers that define a key_type and
+// have its value type as std::pair
+template <typename T, typename Cont>
+auto output_element(std::ostream& os, const T& element,
+                    const Cont&, const std::true_type)
+    -> decltype(std::declval<typename Cont::key_type>(), os);
+// Element output function for other containers
+template <typename T, typename Cont>
+auto output_element(std::ostream& os, const T& element,
+                    const Cont&, ...)
+    -> decltype(os);
 
+// Main output function, enabled only if no output function already exists
 template <typename T,
           typename = std::enable_if_t<!has_output_function_v<T>>>
 auto operator<<(std::ostream& os, const T& container)
@@ -100,7 +111,7 @@ auto operator<<(std::ostream& os, const T& container)
                     on_first_element = false;
                 }
             }
-            output_element(os, *it, is_pair<element_type>());
+            output_element(os, *it, container, is_pair<element_type>());
         }
     }
     if constexpr (!is_char_v) {
@@ -109,16 +120,22 @@ auto operator<<(std::ostream& os, const T& container)
     return os;
 }
 
-template <typename T>
-void output_element(std::ostream& os, const T& element, std::true_type)
+template <typename T, typename Cont>
+auto output_element(std::ostream& os, const T& element,
+                    const Cont&, const std::true_type)
+    -> decltype(std::declval<typename Cont::key_type>(), os)
 {
     os << element.first << " => " << element.second;
+    return os;
 }
 
-template <typename T>
-void output_element(std::ostream& os, const T& element, std::false_type)
+template <typename T, typename Cont>
+auto output_element(std::ostream& os, const T& element,
+                    const Cont&, ...)
+    -> decltype(os)
 {
     os << element;
+    return os;
 }
 
 template <typename T, typename U>
