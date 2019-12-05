@@ -51,11 +51,11 @@ struct has_output_function {
     template <class U>
     static auto output(U* ptr)
         -> decltype(std::declval<std::ostream&>() << *ptr,
-                    std::declval<std::true_type>());
+                    std::true_type());
     template <class U>
     static std::false_type output(...);
-    static const bool value =
-        std::decay_t<decltype(output<T>(nullptr))>::value;
+    static constexpr bool value =
+        decltype(output<T>(nullptr))::value;
 };
 template <typename T>
 inline constexpr bool has_output_function_v =
