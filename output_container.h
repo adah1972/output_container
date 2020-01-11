@@ -93,29 +93,30 @@ auto operator<<(std::ostream& os, const T& container)
     using element_type = decay_t<decltype(*container.begin())>;
     constexpr bool is_char_v = is_same_v<element_type, char>;
     if constexpr (!is_char_v) {
-        os << "{ ";
+        os << '{';
     }
-    if (!container.empty()) {
-        auto end = container.end();
-        bool on_first_element = true;
-        for (auto it = container.begin(); it != end; ++it) {
-            if constexpr (is_char_v) {
-                if (*it == '\0') {
-                    break;
-                }
+    auto end = container.end();
+    bool on_first_element = true;
+    for (auto it = container.begin(); it != end; ++it) {
+        if constexpr (is_char_v) {
+            if (*it == '\0') {
+                break;
             }
-            if constexpr (!is_char_v) {
-                if (!on_first_element) {
-                    os << ", ";
-                } else {
-                    on_first_element = false;
-                }
+        } else {
+            if (!on_first_element) {
+                os << ", ";
+            } else {
+                os << ' ';
+                on_first_element = false;
             }
-            output_element(os, *it, container, is_pair<element_type>());
         }
+        output_element(os, *it, container, is_pair<element_type>());
     }
     if constexpr (!is_char_v) {
-        os << " }";
+        if (!on_first_element) {  // Not empty
+            os << ' ';
+        }
+        os << '}';
     }
     return os;
 }
